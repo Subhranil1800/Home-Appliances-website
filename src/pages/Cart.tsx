@@ -119,7 +119,7 @@ const Cart = () => {
                     </div>
                   </div>
                 </div>
-                <Button size="lg" className="w-full">
+                <Button size="lg" className="w-full" onClick={() => navigate("/checkout")}>
                   Proceed to Checkout
                 </Button>
                 <Button
