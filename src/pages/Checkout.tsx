@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Form,
   FormControl,
@@ -32,6 +34,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { cart, totalPrice, clearCart } = useCart();
   const { toast } = useToast();
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   const form = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
@@ -45,23 +48,85 @@ const Checkout = () => {
     },
   });
 
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Please sign in",
+          description: "You need to be logged in to checkout",
+          variant: "destructive",
+        });
+        navigate("/auth");
+      } else {
+        setIsAuthChecking(false);
+      }
+    };
+    checkAuth();
+  }, [navigate, toast]);
+
   if (cart.length === 0) {
     navigate("/cart");
     return null;
   }
 
-  const handleSubmit = (data: CheckoutFormData) => {
-    // Store order details in localStorage
-    localStorage.setItem("lastOrder", JSON.stringify({
-      items: cart,
-      address: data,
-      total: totalPrice,
-      orderDate: new Date().toISOString(),
-    }));
+  if (isAuthChecking) {
+    return null;
+  }
 
-    // Clear cart and navigate to confirmation
-    clearCart();
-    navigate("/order-confirmation");
+  const handleSubmit = async (data: CheckoutFormData) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to complete your order",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
+
+      // Save order to database
+      const { data: orderData, error } = await supabase
+        .from("orders")
+        .insert([{
+          user_id: session.user.id,
+          full_name: data.fullName,
+          phone: data.phone,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          pincode: data.pincode,
+          items: cart as any,
+          total_price: totalPrice,
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating order:", error);
+        toast({
+          title: "Order failed",
+          description: "There was an error processing your order. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Clear cart and navigate to confirmation
+      clearCart();
+      navigate(`/order-confirmation?orderId=${orderData.id}`);
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Order failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

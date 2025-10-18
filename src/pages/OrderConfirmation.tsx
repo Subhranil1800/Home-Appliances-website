@@ -1,24 +1,70 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const OrderConfirmation = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
   const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const lastOrder = localStorage.getItem("lastOrder");
-    if (lastOrder) {
-      setOrderDetails(JSON.parse(lastOrder));
-    } else {
-      navigate("/");
-    }
-  }, [navigate]);
+    const loadOrder = async () => {
+      const orderId = searchParams.get("orderId");
+      
+      if (!orderId) {
+        toast({
+          title: "Order not found",
+          description: "No order information available",
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
+      }
 
-  if (!orderDetails) {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Please sign in",
+          description: "You need to be logged in to view your order",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (error || !data) {
+        console.error("Error fetching order:", error);
+        toast({
+          title: "Order not found",
+          description: "Could not load your order details",
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
+      }
+
+      setOrderDetails(data);
+      setIsLoading(false);
+    };
+
+    loadOrder();
+  }, [navigate, searchParams, toast]);
+
+  if (isLoading || !orderDetails) {
     return null;
   }
 
@@ -39,11 +85,11 @@ const OrderConfirmation = () => {
           <CardContent className="space-y-6">
             <div className="bg-muted p-4 rounded-lg text-left">
               <h3 className="font-semibold mb-2">Delivery Address</h3>
-              <p className="text-sm">{orderDetails.address.fullName}</p>
-              <p className="text-sm">{orderDetails.address.phone}</p>
-              <p className="text-sm">{orderDetails.address.address}</p>
+              <p className="text-sm">{orderDetails.full_name}</p>
+              <p className="text-sm">{orderDetails.phone}</p>
+              <p className="text-sm">{orderDetails.address}</p>
               <p className="text-sm">
-                {orderDetails.address.city}, {orderDetails.address.state} - {orderDetails.address.pincode}
+                {orderDetails.city}, {orderDetails.state} - {orderDetails.pincode}
               </p>
             </div>
 
@@ -59,7 +105,7 @@ const OrderConfirmation = () => {
               </div>
               <div className="border-t mt-3 pt-3 flex justify-between font-bold">
                 <span>Total Amount</span>
-                <span>₹{orderDetails.total.toLocaleString("en-IN")}</span>
+                <span>₹{orderDetails.total_price.toLocaleString("en-IN")}</span>
               </div>
             </div>
 
