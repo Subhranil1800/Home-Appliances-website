@@ -34,6 +34,8 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { cart, totalPrice, clearCart } = useCart();
   const { toast } = useToast();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   const form = useForm<CheckoutFormData>({
@@ -118,7 +120,7 @@ const Checkout = () => {
 
       // Clear cart and navigate to confirmation
       clearCart();
-      navigate(`/order-confirmation?orderId=${orderData.id}`);
+      navigate(`/order-confirmation/${orderData.id}`);
     } catch (error) {
       console.error("Unexpected error:", error);
       toast({

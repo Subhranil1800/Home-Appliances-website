@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,14 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const OrderConfirmation = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { orderId } = useParams<{ orderId: string }>();
   const { toast } = useToast();
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadOrder = async () => {
-      const orderId = searchParams.get("orderId");
       
       if (!orderId) {
         toast({
@@ -62,7 +61,7 @@ const OrderConfirmation = () => {
     };
 
     loadOrder();
-  }, [navigate, searchParams, toast]);
+  }, [navigate, orderId, toast]);
 
   if (isLoading || !orderDetails) {
     return null;
